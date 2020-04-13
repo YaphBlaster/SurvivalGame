@@ -8,6 +8,34 @@
 
 class UCameraComponent;
 class USkeletalMeshComponent;
+class USInteractionComponent;
+
+USTRUCT()
+struct FInteractionData
+{
+	GENERATED_BODY()
+
+		FInteractionData()
+	{
+		ViewedInteractionComponent = nullptr;
+		LastInteractionCheckTime = 0.f;
+		bInteractHeld = false;
+	}
+
+	//The current interactable component we're viewing, if there is on
+	UPROPERTY()
+		 USInteractionComponent* ViewedInteractionComponent;
+
+	//The time when we last checked for an interactable
+	UPROPERTY()
+		float LastInteractionCheckTime;
+
+	//Whether the local player is holding the interact key
+	UPROPERTY()
+		bool bInteractHeld;
+
+};
+
 
 UCLASS()
 class SURVIVALGAME_API ASCharacter : public ACharacter
@@ -54,6 +82,31 @@ protected:
 
 	void StartCrouching();
 	void StopCrouching();
+
+	//How often in seconds to check for an interactable object. Set this to zero if you want to check every tick.
+	UPROPERTY(EditDefaultsOnly, Category = "Interaction")
+	float InteractionCheckFrequency;
+
+	//How far we'll trace when we check if the player is looking at an interactable object
+	UPROPERTY(EditDefaultsOnly, Category = "Interaction")
+	float InteractionCheckDistance;
+
+	void PerformInteractionCheck();
+
+	void CouldNotFindInteractable();
+	void FoundNewInteractable(USInteractionComponent* Interactable);
+
+	void BeginInteract();
+	void EndInteract();
+
+	void Interact();
+
+	//Information about the current state of the players interaction
+	UPROPERTY()
+	FInteractionData InteractionData;
+
+	//Helper function to make grabbing interactable faster
+	FORCEINLINE USInteractionComponent* GetInteractable() const { return InteractionData.ViewedInteractionComponent; }
 
 public:	
 	// Called every frame

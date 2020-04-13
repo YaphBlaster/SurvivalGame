@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Public/SInteractionComponent.h"
 
 // Sets default values
 ASCharacter::ASCharacter()
@@ -50,6 +51,9 @@ ASCharacter::ASCharacter()
 	BackpackMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("BackpackMesh"));
 	BackpackMesh->SetupAttachment(GetMesh());
 	BackpackMesh->SetMasterPoseComponent(GetMesh());
+
+	InteractionCheckFrequency = 0.f;
+	InteractionCheckDistance = 1000.f;
 
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 
@@ -107,10 +111,73 @@ void ASCharacter::StopCrouching()
 	UnCrouch();
 }
 
+void ASCharacter::PerformInteractionCheck()
+{
+
+	if (GetController() == nullptr)
+		return;
+
+	//Timestamp
+	InteractionData.LastInteractionCheckTime = GetWorld()->GetTimeSeconds();
+
+	FVector EyesLoc;
+	FRotator EyesRot;
+
+	GetController()->GetPlayerViewPoint(EyesLoc, EyesRot);
+
+	FVector TraceStart = EyesLoc;
+	FVector TraceEnd = (EyesRot.Vector() * InteractionCheckDistance) + TraceStart;
+	FHitResult TraceHit;
+
+	FCollisionQueryParams QueryParams;
+	QueryParams.AddIgnoredActor(this);
+
+	if (GetWorld()->LineTraceSingleByChannel(TraceHit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+	{
+		//Check if we hit an object
+		if (TraceHit.GetActor())
+		{
+			//Check if actor has a interaction component
+			if (USInteractionComponent* InteractionComponent = Cast<USInteractionComponent>(TraceHit.GetActor()->GetComponentByClass(USInteractionComponent::StaticClass())))
+			{
+				//How far away the player is
+				float Distance = (TraceStart - TraceHit.ImpactPoint).Size();
+				
+				//If the InteractionComponent is not the old interactable we just saw and we are close enough to the interactable
+				if (InteractionComponent != GetInteractable() && Distance <= InteractionComponent->InteractionDistance)
+				{
+					FoundNewInteractable(InteractionComponent);
+				}
+				else if (Distance > InteractionComponent->InteractionDistance && GetInteractable())
+				{
+					CouldNotFindInteractable();
+				}
+
+				return;
+			}
+				
+		}
+	}
+
+	CouldNotFindInteractable();
+}
+
+void ASCharacter::CouldNotFindInteractable()
+{
+
+}
+
+void ASCharacter::FoundNewInteractable(USInteractionComponent* Interactable)
+{
+	UE_LOG(LogTemp, Log, TEXT("We Found an interactable"));
+}
+
 // Called every frame
 void ASCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	PerformInteractionCheck();
 
 }
 
